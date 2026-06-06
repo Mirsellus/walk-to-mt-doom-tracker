@@ -251,7 +251,11 @@ function renderLog(){
       (Math.abs(total-cur)>0.05 ? " <span class='hint'>(current total above is "+cur.toFixed(1)+" km)</span>" : "")
     : "<span class='hint'>No walks logged yet — add your first above.</span>";
   t.querySelectorAll(".del").forEach(b=>b.addEventListener("click",()=>{
-    const i=+b.dataset.i;
+    const i=+b.dataset.i, e=LOG[i];
+    const msg="Remove this walk?\n\n"+(e.date||"")+"  ·  "+(+e.km).toFixed(1)+" km"+
+      (e.note?"\n“"+e.note+"”":"")+"\n\nThis subtracts "+(+e.km).toFixed(1)+
+      " km from his total — only do this if it was logged by mistake.";
+    if(!confirm(msg)) return;
     setKm((parseFloat(kmIn.value)||0) - (+LOG[i].km||0));
     LOG.splice(i,1); saveLog(); renderLog(); render();
   }));
