@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Walk to Mount Doom — Tracker</title>
+<link rel="stylesheet" href="lib/leaflet.css">
+<style>
+  #map{height:480px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#000}
+  .leaflet-container{background:#000; font-family:inherit}
+  .here{width:16px; height:16px; border-radius:50%; background:#d83a2a;
+    border:3px solid #fff; box-shadow:0 0 0 2px #8c2f1d, 0 0 9px rgba(0,0,0,.8)}
+  .lm-star{color:#ffd24a; font:700 15px/1 serif; text-shadow:0 0 3px #000,0 0 3px #000; cursor:default}
+  :root{
+    --ink:#2b2317; --parch:#f4ecd8; --parch2:#ece0c2; --gold:#9c6b1e;
+    --green:#3f6b3f; --red:#8c2f1d; --line:#cdbb95; --muted:#6f6047;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    color:var(--ink); background:var(--parch);
+    background-image:radial-gradient(ellipse at top,#faf4e4,transparent 60%);
+    line-height:1.5;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:24px 18px 80px}
+  h1{font-size:2rem; margin:.2em 0 0; letter-spacing:.5px; text-align:center}
+  .sub{text-align:center; color:var(--muted); margin:.2em 0 1.4em; font-style:italic}
+  .panel{background:var(--parch2); border:1px solid var(--line); border-radius:10px;
+    padding:18px 20px; margin:0 0 22px; box-shadow:0 1px 0 #fff inset}
+  label{display:block; font-weight:600; margin-bottom:4px}
+  input[type=number]{font:inherit; font-size:1.3rem; padding:8px 10px; width:160px;
+    border:1px solid var(--line); border-radius:6px; background:#fffdf6}
+  .row{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-end}
+  .you{font-size:1.05rem; margin-top:14px}
+  .you b{color:var(--red)}
+  .bar{height:18px; background:#ddceac; border:1px solid var(--line);
+    border-radius:10px; overflow:hidden; margin:12px 0 6px}
+  .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--green),#5e8a4f); width:0}
+  .pct{font-size:.85rem; color:var(--muted)}
+  .pace{font-size:.95rem; color:var(--muted); margin-top:10px}
+  table{width:100%; border-collapse:collapse; margin-top:6px}
+  th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:.8rem; text-transform:uppercase; letter-spacing:.6px; color:var(--muted)}
+  td.km{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .stagehdr td{background:#e3d4b0; font-weight:700; font-size:1.02rem;
+    border-top:2px solid var(--gold); letter-spacing:.4px}
+  .done .name{color:var(--muted)}
+  .done .tick{color:var(--green)}
+  tr.current{background:#fff6df}
+  tr.current .name{font-weight:700}
+  .tick{width:1.4em; display:inline-block}
+  .note{color:var(--muted); font-size:.86rem}
+  .est{color:var(--gold); font-size:.72rem; vertical-align:super}
+  .star{color:var(--gold)}
+  details{margin-top:24px; color:var(--muted); font-size:.9rem}
+  summary{cursor:pointer; font-weight:600; color:var(--ink)}
+  footer{text-align:center; color:var(--muted); font-size:.8rem; margin-top:30px}
+  .big{font-size:1.25rem}
+  button{font:inherit; cursor:pointer; padding:8px 14px; border:1px solid var(--line);
+    border-radius:6px; background:#fffdf6; color:var(--ink)}
+  button:hover{background:#fff; border-color:var(--gold)}
+  button.primary{background:var(--green); color:#fff; border-color:var(--green)}
+  button.primary:hover{background:#4f7a4f}
+  .tools{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+  .logrow{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end}
+  .logrow input[type=date]{font:inherit; padding:8px 10px; border:1px solid var(--line);
+    border-radius:6px; background:#fffdf6}
+  .logrow input.kmlog{width:120px; font-size:1.05rem}
+  .logrow input.note{flex:1; min-width:160px; font:inherit; padding:8px 10px;
+    border:1px solid var(--line); border-radius:6px; background:#fffdf6}
+  #logTable{width:100%; border-collapse:collapse; margin-top:14px}
+  #logTable th,#logTable td{padding:6px 8px; border-bottom:1px solid var(--line); text-align:left}
+  #logTable td.n{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+  #logTable .del{color:var(--red); cursor:pointer; font-weight:700; border:none; background:none; padding:2px 6px}
+  .logsum{margin-top:10px; font-weight:600}
+  .hint{color:var(--muted); font-size:.85rem; margin:2px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The Walk to Mount Doom</h1>
+  <div class="sub">Bag End &rarr; Mount Doom &nbsp;·&nbsp; 2,863&nbsp;km &nbsp;·&nbsp; one step at a time</div>
+
+  <div class="panel">
+    <div class="row">
+      <div>
+        <label for="km">Total kilometres walked</label>
+        <input id="km" type="number" min="0" step="0.1" placeholder="0">
+      </div>
+      <div>
+        <label for="pace">Your weekly pace (km)</label>
+        <input id="pace" type="number" min="0" step="1" placeholder="25">
+      </div>
+    </div>
+
+    <div class="you" id="you"></div>
+    <div class="bar"><i id="fill"></i></div>
+    <div class="pct" id="pct"></div>
+    <div class="pace" id="eta"></div>
+
+    <div class="tools">
+      <button id="exportBtn">⬇ Export backup</button>
+      <button id="importBtn">⬆ Import backup</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+    </div>
+    <p class="hint">Backup saves your total, pace &amp; walk log to a file — use it to move
+    between phone and computer, or keep it safe.</p>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <label style="margin:0">The road so far</label>
+      <button id="centerBtn">⦿ Centre on me</button>
+    </div>
+    <div id="map"></div>
+    <p class="hint">Drag to pan, scroll to zoom. The red marker is where he'd be standing on Frodo's
+    road; the gold stars are the four great stages. ★ = landmark reached.</p>
+  </div>
+
+  <div class="panel">
+    <label>Walk log <span class="hint" style="font-weight:400">— add each walk; it adds to your total</span></label>
+    <div class="logrow">
+      <div>
+        <div class="hint">Date</div>
+        <input id="logDate" type="date">
+      </div>
+      <div>
+        <div class="hint">km this walk</div>
+        <input id="logKm" class="kmlog" type="number" min="0" step="0.1" placeholder="0">
+      </div>
+      <input id="logNote" class="note" type="text" placeholder="note (optional) — e.g. river trail with the dog">
+      <button class="primary" id="logAdd">Add walk</button>
+    </div>
+    <div class="logsum" id="logSum"></div>
+    <table id="logTable"></table>
+  </div>
+
+  <table id="tbl">
+    <thead><tr><th></th><th>Landmark</th><th class="km">From Bag End</th><th class="km">To go</th></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+
+  <details>
+    <summary>About the distances &amp; accuracy</summary>
+    <p>Total journey: <b>1,779 miles / 2,863 km</b>, Bag End to the Cracks of Doom &mdash; the
+    figure used by the long-running <i>Éowyn Challenge</i> "Walk to Mordor", derived from Barbara
+    Strachey's <i>Journeys of Frodo</i> and Karen Wynn Fonstad's <i>Atlas of Middle-earth</i>.</p>
+    <p>The four <span class="star">★</span> stage totals (Rivendell 737&nbsp;km, Lothlórien
+    1,481&nbsp;km, Rauros 2,107&nbsp;km, Mount Doom 2,863&nbsp;km) and every landmark in
+    <b>Stage 1</b> come straight from that mile-by-mile data. Landmarks marked
+    <span class="est">est</span> in stages 2–4 are positioned from the <b>route plotted on the
+    map</b>: each stage's verified total is split among its landmarks in proportion to the actual
+    on-map path distance between them &mdash; far better than a guess, though still an estimate.</p>
+    <p>Distances are Tolkien's geography, not a game map. (LOTRO and most game maps compress the
+    world heavily and aren't to scale.) 1 mile = 1.60934 km.</p>
+    <p>Your km total and pace are saved in this browser only.</p>
+  </details>
+
+  <footer>There and back again — a tracker. &nbsp;|&nbsp; Not for me. For my brother.</footer>
+</div>
+
+<script src="lib/leaflet.js"></script>
+<script src="_data/route.js"></script>
+<script>
+// stage, name, miles (cumulative from Bag End), note, est(bool), star(0-2)
+const DATA = [
+ ["1","Bag End — the journey begins",0,"Leave The Hill after dark",false,0],
+ ["1","First night's camp",18,"Frodo, Sam & Pippin sleep in the firwood",false,0],
+ ["1","Woody End — Gildor's Elves",41,"“The wide world is all about you”",false,0],
+ ["1","Farmer Maggot's farm",63,"Mushrooms, and a ride to the Ferry",false,0],
+ ["1","Bucklebury Ferry",70,"Across the Brandywine, a Rider behind",false,0],
+ ["1","Crickhollow",73,"The conspiracy is unmasked",false,0],
+ ["1","The Old Forest",78,"Through the Hedge into the trees",false,0],
+ ["1","Tom Bombadil's house",98,"Old Man Willow & a yellow-booted rescue",false,0],
+ ["1","The Barrow-downs",112,"“Cold be hand and heart and bone”",false,0],
+ ["1","Bree — The Prancing Pony",135,"Butterbur, and a Ranger named Strider",false,0],
+ ["1","Midgewater Marshes",173,"Midges, neekerbreekers, no fires",false,0],
+ ["1","Weathertop (Amon Sûl)",240,"The Morgul-blade in the dark",false,0],
+ ["1","Last Bridge — River Hoarwell",358,"Glorfindel's elf-stone found here",false,0],
+ ["1","The Trollshaws — Stone Trolls",393,"Bilbo's old trolls, turned to stone",false,0],
+ ["1","Ford of Bruinen",450,"“By Elbereth and Lúthien the Fair!”",false,0],
+ ["1","RIVENDELL — the Last Homely House",458,"Rest. The Council. The Fellowship is forged.",false,1],
+
+ ["2","Eregion (Hollin)",585,"Old Elf-country; crebain spy from the south",true,0],
+ ["2","Redhorn Pass — Caradhras",674,"The cruel mountain turns them back",true,0],
+ ["2","West-gate of Moria",713,"“Speak, friend, and enter”",true,0],
+ ["2","Bridge of Khazad-dûm",775,"“You shall not pass!” — Gandalf falls",true,0],
+ ["2","Dimrill Dale & Mirrormere",816,"Out the East-gate into daylight, grieving",true,0],
+ ["2","Nimrodel & Cerin Amroth",874,"Into the Golden Wood",true,0],
+ ["2","LOTHLÓRIEN — Caras Galadhon",920,"Galadriel, the Mirror, gifts & farewells",false,1],
+
+ ["3","The Great River — Sarn Gebir",1169,"Down the Anduin; rapids and orc-arrows by night",true,0],
+ ["3","The Argonath",1227,"The Pillars of the Kings stand in judgement",true,0],
+ ["3","Nen Hithoel & Parth Galen",1279,"The lawn above the falls",true,0],
+ ["3","RAUROS FALLS — Amon Hen",1309,"The Fellowship breaks; Frodo & Sam go east alone",false,1],
+
+ ["4","The Emyn Muil",1353,"Lost in the stone maze; Gollum is caught",true,0],
+ ["4","The Dead Marshes",1407,"“Don't follow the lights!”",true,0],
+ ["4","The Black Gate (Morannon)",1440,"Shut fast — they turn south instead",true,0],
+ ["4","Henneth Annûn — Ithilien",1494,"Faramir, and the forbidden pool",true,0],
+ ["4","The Cross-roads",1561,"The fallen king crowned with flowers",true,0],
+ ["4","Minas Morgul",1590,"The dead city; the stair begins",true,0],
+ ["4","Cirith Ungol",1619,"Shelob's lair, the tower, the captured master",true,0],
+ ["4","Plateau of Gorgoroth",1699,"The last march across the ash",true,0],
+ ["4","MOUNT DOOM — the Cracks of Doom",1779,"It is done.",false,2],
+];
+const STAGES = {
+ "1":"Stage 1 · The Shire & Eriador — Bag End to Rivendell",
+ "2":"Stage 2 · The Fellowship — Rivendell to Lothlórien",
+ "3":"Stage 3 · The Great River — Lothlórien to Rauros",
+ "4":"Stage 4 · The Black Land — Rauros to Mount Doom",
+};
+const MI = 1.60934;
+const km = mi => Math.round(mi*MI);
+const TOTAL = km(1779);
+
+const kmIn = document.getElementById("km");
+const paceIn = document.getElementById("pace");
+kmIn.value = localStorage.getItem("lotr_km") || "";
+paceIn.value = localStorage.getItem("lotr_pace") || "25";
+
+// ---- Walk log ----
+const logDate=document.getElementById("logDate");
+const logKm=document.getElementById("logKm");
+const logNote=document.getElementById("logNote");
+let LOG = JSON.parse(localStorage.getItem("lotr_log") || "[]");
+logDate.valueAsDate = new Date();
+
+function saveLog(){ localStorage.setItem("lotr_log", JSON.stringify(LOG)); }
+function setKm(v){ kmIn.value = Math.max(0, Math.round(v*10)/10); localStorage.setItem("lotr_km", kmIn.value); }
+
+function renderLog(){
+  const t=document.getElementById("logTable");
+  const sum=document.getElementById("logSum");
+  const total = LOG.reduce((a,e)=>a+(+e.km||0),0);
+  const cur = parseFloat(kmIn.value)||0;
+  let html="";
+  if(LOG.length){
+    html="<tr><th>Date</th><th>Note</th><th>km</th><th></th></tr>";
+    // newest first
+    [...LOG].map((e,i)=>({e,i})).sort((a,b)=> (a.e.date<b.e.date?1:-1))
+      .forEach(({e,i})=>{
+        html+="<tr><td>"+(e.date||"")+"</td><td>"+(e.note?escapeHtml(e.note):"<span class='hint'>—</span>")+
+          "</td><td class='n'>"+(+e.km).toFixed(1)+"</td>"+
+          "<td><button class='del' data-i='"+i+"' title='delete'>✕</button></td></tr>";
+      });
+  }
+  t.innerHTML=html;
+  sum.innerHTML = LOG.length
+    ? LOG.length+" walks logged · "+total.toFixed(1)+" km in the log"+
+      (Math.abs(total-cur)>0.05 ? " <span class='hint'>(current total above is "+cur.toFixed(1)+" km)</span>" : "")
+    : "<span class='hint'>No walks logged yet — add your first above.</span>";
+  t.querySelectorAll(".del").forEach(b=>b.addEventListener("click",()=>{
+    const i=+b.dataset.i;
+    setKm((parseFloat(kmIn.value)||0) - (+LOG[i].km||0));
+    LOG.splice(i,1); saveLog(); renderLog(); render();
+  }));
+}
+function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+document.getElementById("logAdd").addEventListener("click",()=>{
+  const km=parseFloat(logKm.value);
+  if(!(km>0)){ logKm.focus(); return; }
+  LOG.push({date: logDate.value || new Date().toISOString().slice(0,10), km: km, note: logNote.value.trim()});
+  saveLog();
+  setKm((parseFloat(kmIn.value)||0) + km);
+  logKm.value=""; logNote.value="";
+  renderLog(); render();
+});
+
+// ---- Export / Import ----
+document.getElementById("exportBtn").addEventListener("click",()=>{
+  const data={app:"walk-to-mount-doom", version:1, exported:new Date().toISOString(),
+    km:kmIn.value, pace:paceIn.value, log:LOG};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="walk-to-mount-doom-backup.json";
+  a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById("importBtn").addEventListener("click",()=>document.getElementById("importFile").click());
+document.getElementById("importFile").addEventListener("change",ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(d.km!==undefined) kmIn.value=d.km;
+      if(d.pace!==undefined) paceIn.value=d.pace;
+      if(Array.isArray(d.log)) LOG=d.log;
+      localStorage.setItem("lotr_km",kmIn.value);
+      localStorage.setItem("lotr_pace",paceIn.value);
+      saveLog(); renderLog(); render();
+      alert("Backup restored — "+LOG.length+" walks loaded.");
+    }catch(e){ alert("Sorry, that doesn't look like a valid backup file."); }
+    ev.target.value="";
+  };
+  r.readAsText(f);
+});
+
+function fmtMonths(weeks){
+  if(!isFinite(weeks)||weeks<=0) return "";
+  const m = weeks/4.345;
+  if(m<1.5) return Math.round(weeks)+" weeks";
+  if(m<18) return "about "+Math.round(m)+" months";
+  return "about "+(m/12).toFixed(1)+" years";
+}
+
+function render(){
+  const walked = parseFloat(kmIn.value)||0;
+  const pace = parseFloat(paceIn.value)||0;
+  localStorage.setItem("lotr_km", kmIn.value);
+  localStorage.setItem("lotr_pace", paceIn.value);
+
+  // find current segment
+  let prev=DATA[0], next=null, prevKm=0;
+  for(const d of DATA){
+    const k=km(d[2]);
+    if(k<=walked){ prev=d; prevKm=k; }
+    else { next=d; break; }
+  }
+  const pct = Math.min(100, (walked/TOTAL)*100);
+  document.getElementById("fill").style.width = pct+"%";
+  document.getElementById("pct").textContent =
+    walked.toFixed(0)+" km of "+TOTAL+" km";
+
+  const you = document.getElementById("you");
+  if(walked<=0){
+    you.innerHTML = "Enter your total kilometres to see where on the road you stand.";
+  } else if(walked>=TOTAL){
+    you.innerHTML = "<span class='big'>🌋 You have reached <b>Mount Doom</b>. The Ring is unmade. 🌋</span>";
+  } else {
+    const toNext = km(next[2]) - walked;
+    you.innerHTML = "You have just passed <b>"+prev[1].replace(/ —.*/,'').replace(/ ·.*/,'')+"</b>. "+
+      "Next: <b>"+next[1].replace(/ —.*/,'')+"</b> in <b>"+toNext.toFixed(0)+" km</b>.";
+  }
+
+  const eta = document.getElementById("eta");
+  if(pace>0 && walked<TOTAL){
+    let msg = "";
+    if(next){ const w=(km(next[2])-walked)/pace; msg += "At "+pace+" km/week: next landmark in "+fmtMonths(w)+". "; }
+    const wEnd=(TOTAL-walked)/pace;
+    msg += "Mount Doom in "+fmtMonths(wEnd)+".";
+    eta.textContent = msg;
+  } else { eta.textContent=""; }
+
+  // table
+  const body=document.getElementById("body");
+  body.innerHTML="";
+  let curStage=null;
+  for(let i=0;i<DATA.length;i++){
+    const d=DATA[i], k=km(d[2]);
+    if(d[0]!==curStage){
+      curStage=d[0];
+      const hr=document.createElement("tr");
+      hr.className="stagehdr";
+      hr.innerHTML="<td colspan='4'>"+STAGES[d[0]]+"</td>";
+      body.appendChild(hr);
+    }
+    const passed = walked>=k && walked>0;
+    const isCurrent = next && DATA[i]===next;
+    const tr=document.createElement("tr");
+    tr.className=(passed?"done ":"")+(isCurrent?"current":"");
+    const tick = passed?"✅":(isCurrent?"▶":"⬜");
+    const star = d[5]===2?" <span class='star'>★★</span>":(d[5]===1?" <span class='star'>★</span>":"");
+    const est = d[4]?" <span class='est'>est</span>":"";
+    const toGo = (!passed && walked>0) ? (k-walked).toFixed(0)+" km" : (passed?"✓":"");
+    tr.innerHTML =
+      "<td><span class='tick'>"+tick+"</span></td>"+
+      "<td><span class='name'>"+d[1]+star+est+"</span><br><span class='note'>"+d[3]+"</span></td>"+
+      "<td class='km'>"+k+" km</td>"+
+      "<td class='km'>"+toGo+"</td>";
+    body.appendChild(tr);
+  }
+
+  if(window.mapReady) updateDot(walked);
+}
+kmIn.addEventListener("input",()=>{render(); renderLog();});
+paceIn.addEventListener("input",render);
+render();
+renderLog();
+
+// ===== Interactive map (Leaflet) =====
+const MW=14150, MH=11600, MMAXZ=5, MTILE=512;
+let lmap=null, dotMarker=null;
+window.mapReady=false;
+const m_p2l=(x,y)=>lmap.unproject([x,y],MMAXZ);
+
+// landmark anchors: flatten route waypoints (dedupe section connectors) and pair
+// each with its checklist landmark's km (DATA, in order) — 36 waypoints = 36 landmarks.
+const ANCHORS=(function(){
+  const flat=[];
+  window.ROUTE.sections.forEach((s,si)=>s.waypoints.forEach((w,wi)=>{ if(si>0&&wi===0) return; flat.push(w); }));
+  return flat.map((w,i)=>({x:w[0], y:w[1], km:(DATA[i]?km(DATA[i][2]):0)}));
+})();
+function dotPos(walked){
+  if(walked<=ANCHORS[0].km) return [ANCHORS[0].x,ANCHORS[0].y];
+  const last=ANCHORS[ANCHORS.length-1];
+  if(walked>=last.km) return [last.x,last.y];
+  for(let i=1;i<ANCHORS.length;i++){
+    if(walked<=ANCHORS[i].km){
+      const a=ANCHORS[i-1], b=ANCHORS[i], dk=b.km-a.km, t=dk?(walked-a.km)/dk:0;
+      return [a.x+(b.x-a.x)*t, a.y+(b.y-a.y)*t];
+    }
+  }
+  return [last.x,last.y];
+}
+function updateDot(walked, recenter){
+  if(!window.mapReady) return;
+  const p=dotPos(walked), ll=m_p2l(p[0],p[1]);
+  dotMarker.setLatLng(ll);
+  if(recenter) lmap.setView(ll, Math.max(lmap.getZoom(),3));
+}
+function initMap(){
+  if(!window.L || !window.ROUTE){ return; }
+  lmap=L.map('map',{crs:L.CRS.Simple,minZoom:0,maxZoom:MMAXZ+2,attributionControl:false,zoomSnap:0.25,wheelPxPerZoomLevel:90});
+  const b=L.latLngBounds(m_p2l(0,0),m_p2l(MW,MH));
+  L.tileLayer('tiles/{z}/{x}/{y}.webp',{tileSize:MTILE,minZoom:0,maxNativeZoom:MMAXZ,maxZoom:MMAXZ+2,bounds:b,noWrap:true,
+    errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}).addTo(lmap);
+  lmap.fitBounds(b); lmap.setMaxBounds(b.pad(0.4));
+  // route line + stage stars
+  window.ROUTE.sections.forEach((s,si)=>{
+    L.polyline(s.waypoints.map(w=>m_p2l(w[0],w[1])),{color:'#e8c45a',weight:3,opacity:.9}).addTo(lmap);
+    const end=s.waypoints[s.waypoints.length-1];
+    L.marker(m_p2l(end[0],end[1]),{icon:L.divIcon({className:'',html:'<div class="lm-star">★</div>',iconSize:[16,16],iconAnchor:[8,8]}),
+      title:s.name.split('→')[1]?.trim()||s.name}).addTo(lmap);
+  });
+  const start=window.ROUTE.sections[0].waypoints[0];
+  dotMarker=L.marker(m_p2l(start[0],start[1]),{icon:L.divIcon({className:'',html:'<div class="here"></div>',iconSize:[16,16],iconAnchor:[8,8]}),
+    zIndexOffset:1000, title:'You are here'}).addTo(lmap);
+  window.mapReady=true;
+  updateDot(parseFloat(kmIn.value)||0, true);
+}
+document.getElementById('centerBtn').addEventListener('click',()=>updateDot(parseFloat(kmIn.value)||0, true));
+initMap();
+</script>
+</body>
+</html>
